@@ -34,6 +34,11 @@
           <input type="file" id="videoInput" accept="video/*,audio/*" hidden />
         </div>
 
+        <div class="url-row">
+          <input type="url" id="videoUrl" class="text" data-i18n-ph="urlPlaceholder" placeholder="" />
+          <button class="btn" id="videoUrlLoad" data-i18n="load">Загрузить</button>
+        </div>
+
         <div class="source-summary" id="videoSummary" hidden></div>
 
         <div class="actions-box">
@@ -175,14 +180,14 @@
             <div class="setting">
               <div class="setting-head">
                 <strong data-i18n="sensitivity">Чувствительность</strong>
-                <span class="mono muted" id="thresholdVal">0.30</span>
+                <span class="mono muted" id="thresholdVal">0.18</span>
               </div>
               <div class="segmented small" id="sensPreset">
                 <button class="seg-btn" data-val="0.45" data-i18n="sensLow">Низкая</button>
-                <button class="seg-btn is-active" data-val="0.30" data-i18n="sensMed">Средняя</button>
-                <button class="seg-btn" data-val="0.18" data-i18n="sensHigh">Высокая</button>
+                <button class="seg-btn" data-val="0.30" data-i18n="sensMed">Средняя</button>
+                <button class="seg-btn is-active" data-val="0.18" data-i18n="sensHigh">Высокая</button>
               </div>
-              <input type="range" id="threshold" min="0.05" max="0.9" step="0.01" value="0.30" />
+              <input type="range" id="threshold" min="0.05" max="0.9" step="0.01" value="0.18" />
               <p class="hint" data-i18n="sensitivityHint">Ниже порог — больше кадров</p>
             </div>
 

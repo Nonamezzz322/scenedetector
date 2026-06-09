@@ -24,6 +24,12 @@ const DICT = {
   download:        ["Скачать", "Завантажити", "Download"],
   copyText:        ["Копировать текст", "Копіювати текст", "Copy text"],
   copied:          ["Скопировано", "Скопійовано", "Copied"],
+  load:            ["Загрузить", "Завантажити", "Load"],
+  urlPlaceholder:  ["ссылка на прямое видео (.mp4, .webm, .mov…)", "посилання на пряме відео (.mp4, .webm, .mov…)", "direct video link (.mp4, .webm, .mov…)"],
+  loadingUrl:      ["Загрузка по ссылке…", "Завантаження за посиланням…", "Loading from link…"],
+  urlError:        ["Не удалось загрузить по ссылке. Нужна ПРЯМАЯ ссылка на видеофайл (.mp4/.webm/.mov), и сервер должен разрешать доступ (CORS). YouTube/TikTok/Instagram так не работают — скачайте файл и загрузите его как обычно.",
+                    "Не вдалося завантажити за посиланням. Потрібне ПРЯМЕ посилання на відеофайл (.mp4/.webm/.mov), і сервер має дозволяти доступ (CORS). YouTube/TikTok/Instagram так не працюють — завантажте файл і відкрийте його як зазвичай.",
+                    "Couldn't load from the link. It must be a DIRECT video-file URL (.mp4/.webm/.mov) whose server allows cross-origin (CORS). YouTube/TikTok/Instagram won't work this way — download the file and open it normally."],
 
   // video tab
   dropVideo:       ["Перетащите сюда видеофайл", "Перетягніть сюди відеофайл", "Drag a video file here"],
@@ -127,10 +133,13 @@ export function t(key) {
   return entry[idx] ?? entry[0];
 }
 
-/** Set textContent of every [data-i18n] under root. */
+/** Set textContent of every [data-i18n] (and placeholder of every [data-i18n-ph]) under root. */
 export function applyI18n(root = document) {
   root.querySelectorAll("[data-i18n]").forEach((el) => {
     el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  root.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+    el.placeholder = t(el.getAttribute("data-i18n-ph"));
   });
 }
 

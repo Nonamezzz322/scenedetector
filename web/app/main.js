@@ -2,19 +2,26 @@
 
 import { $, $$, show } from "./ui/dom.js";
 import { applyI18n, onLangChange } from "./i18n.js";
+import * as settings from "./settings.js";
 import { initSettingsPanel } from "./ui/settingsPanel.js";
 import { initVideoTab } from "./ui/videoTab.js";
 import { initFolderTab } from "./ui/folderTab.js";
 
+function activateTab(tab) {
+  $$("#tabbar .seg-btn").forEach((b) => b.classList.toggle("is-active", b.getAttribute("data-tab") === tab));
+  $$(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-${tab}`));
+}
+
 function initTabs() {
-  const buttons = $$("#tabbar .seg-btn");
-  buttons.forEach((btn) =>
+  $$("#tabbar .seg-btn").forEach((btn) =>
     btn.addEventListener("click", () => {
       const tab = btn.getAttribute("data-tab");
-      buttons.forEach((b) => b.classList.toggle("is-active", b === btn));
-      $$(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-${tab}`));
+      settings.set("activeTab", tab);
+      activateTab(tab);
     })
   );
+  // Restore the last-open tab (persisted in localStorage).
+  activateTab(settings.get("activeTab") === "folder" ? "folder" : "video");
 }
 
 function initSettingsOverlay() {

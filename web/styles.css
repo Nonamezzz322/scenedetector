@@ -126,6 +126,10 @@ body {
 .dropzone-icon { font-size: 38px; }
 .dropzone p { color: var(--muted); margin: 8px 0 12px; }
 
+/* URL input row */
+.url-row { display: flex; gap: 8px; }
+.url-row input { flex: 1; }
+
 /* ---------- Buttons ---------- */
 .btn {
   border: 1px solid var(--border);

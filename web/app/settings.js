@@ -1,10 +1,11 @@
 // Persistent settings store (localStorage), mirroring the desktop app's @AppStorage keys.
 
-const KEY = "ss_settings_v1";
+// Bump the version to roll out new defaults (e.g. High sensitivity) to existing browsers.
+const KEY = "ss_settings_v2";
 
 const DEFAULTS = {
   // frames
-  threshold: 0.30,        // 0.05..0.9, lower = more frames
+  threshold: 0.18,        // 0.05..0.9, lower = more frames. Default = High sensitivity.
   minInterval: 0.0,       // seconds, 0 = off
   format: "jpg",          // "jpg" | "png"
   jpegQuality: 3,         // 2..31 (ffmpeg scale, lower = better) -> mapped to canvas quality
@@ -20,6 +21,12 @@ const DEFAULTS = {
   tx_txt: true,
   tx_srt: true,
   tx_device: "auto",      // "auto" | "webgpu" | "wasm"
+  // UI state (persisted so choices survive reloads, like the desktop @AppStorage toggles)
+  vid_frames: true,
+  vid_transcribe: false,
+  batchDoFrames: true,
+  batchDoTranscribe: false,
+  activeTab: "video",     // "video" | "folder"
 };
 
 let state = load();

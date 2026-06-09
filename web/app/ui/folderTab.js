@@ -12,8 +12,11 @@ import { transcribe } from "../transcribe/whisper.js";
 import { buildSRT, buildTXT } from "../transcribe/srt.js";
 import { renderFrameGrid } from "./frameGrid.js";
 import { makeThumbnail } from "./thumbnail.js";
-import { writeJobs } from "../io/output.js";
-import { isFSAccessSupported, pickDirectory, listVideosInHandle, listVideoFiles, getSubdir } from "../io/localFolder.js";
+import { zipAndDownload } from "../io/save.js";
+import { listVideoFiles } from "../io/localFolder.js";
+
+// Top-level folder all output is grouped under (created on extract from the ZIP).
+const APP_FOLDER = "SceneShot";
 
 export function initFolderTab() {
   const ui = {
@@ -30,31 +33,28 @@ export function initFolderTab() {
   };
 
   const state = {
-    dirHandle: null, label: "", videos: [], results: [],
+    label: "", videos: [], results: [],
     working: false, abort: null, ran: false,
   };
 
   // ---------- input ----------
-  ui.pick.addEventListener("click", async () => {
-    if (isFSAccessSupported()) {
-      const handle = await pickDirectory();
-      if (!handle) return;
-      const list = await listVideosInHandle(handle);
-      loadVideos(handle, handle.name, list.map((e) => ({ name: e.name, getFile: () => e.handle.getFile() })));
-    } else {
-      ui.input.click();
-    }
-  });
+  // We use <input webkitdirectory> (not the File System Access showDirectoryPicker), because
+  // Chrome's File System Access API blocklists sensitive folders — on macOS that includes
+  // Downloads/Desktop/Documents ("содержит системные файлы"). webkitdirectory has no such
+  // blocklist, so any folder (incl. Downloads) can be picked; it's read-only, which is all we need.
+  ui.pick.addEventListener("click", () => ui.input.click());
   ui.input.addEventListener("change", () => {
-    const vids = listVideoFiles(ui.input.files);
+    const all = listVideoFiles(ui.input.files);
+    // Only videos directly in the chosen folder (not nested subfolders), matching the desktop app.
+    const topLevel = all.filter((f) => (f.webkitRelativePath || "").split("/").length <= 2);
+    const vids = topLevel.length ? topLevel : all;
     const label = (ui.input.files[0]?.webkitRelativePath || "").split("/")[0] || "batch";
-    loadVideos(null, label, vids.map((f) => ({ name: f.name, getFile: () => Promise.resolve(f) })));
+    loadVideos(label, vids.map((f) => ({ name: f.name, getFile: () => Promise.resolve(f) })));
     ui.input.value = "";
   });
 
-  async function loadVideos(dirHandle, label, items) {
+  async function loadVideos(label, items) {
     reset();
-    state.dirHandle = dirHandle;
     state.label = label;
     if (!items.length) { setNotice(pickLang({ ru: "В этой папке нет видеофайлов.", uk: "У цій папці немає відеофайлів.", en: "No video files in this folder." }), true); return; }
     state.videos = items.map((it, i) => ({ id: `v${i}`, name: it.name, getFile: it.getFile, thumb: null, selected: false }));
@@ -88,9 +88,12 @@ export function initFolderTab() {
   ui.selectAll.addEventListener("click", () => { state.videos.forEach((v) => (v.selected = true)); renderGrid(); updateRunLabel(); });
   ui.clearAll.addEventListener("click", () => { state.videos.forEach((v) => (v.selected = false)); renderGrid(); updateRunLabel(); });
 
-  // ---------- actions ----------
-  ui.doTranscribe.addEventListener("change", () => show(ui.langRow, ui.doTranscribe.checked));
-  ui.doFrames.addEventListener("change", updateRunLabel);
+  // ---------- actions (persisted) ----------
+  ui.doFrames.checked = settings.get("batchDoFrames");
+  ui.doTranscribe.checked = settings.get("batchDoTranscribe");
+  show(ui.langRow, ui.doTranscribe.checked);
+  ui.doTranscribe.addEventListener("change", () => { settings.set("batchDoTranscribe", ui.doTranscribe.checked); show(ui.langRow, ui.doTranscribe.checked); });
+  ui.doFrames.addEventListener("change", () => { settings.set("batchDoFrames", ui.doFrames.checked); updateRunLabel(); });
   setSegActive(ui.lang, "data-lang", settings.get("tx_language"));
   $$("#folderLang .seg-btn").forEach((b) =>
     b.addEventListener("click", () => { settings.set("tx_language", b.getAttribute("data-lang")); setSegActive(ui.lang, "data-lang", settings.get("tx_language")); })
@@ -221,7 +224,8 @@ export function initFolderTab() {
   async function saveAll() {
     const fmt = settings.get("format");
     const stitch = settings.get("stitchFrames");
-    const jobs = [];
+    const folderName = `${state.label || "batch"}-batch-${stamp()}`;
+    const entries = [];
     let framesTotal = 0;
     for (const r of state.results) {
       const selected = r.order.map((id) => r.frames.find((f) => f.id === id)).filter(Boolean);
@@ -234,36 +238,29 @@ export function initFolderTab() {
         if (r.transcript.tp.writeTxt) files.push({ name: "transcript.txt", blob: new Blob([buildTXT(r.transcript.text)], { type: "text/plain" }) });
         if (r.transcript.tp.writeSrt && r.transcript.chunks.length) files.push({ name: "transcript.srt", blob: new Blob([buildSRT(r.transcript.chunks)], { type: "text/plain" }) });
       }
-      if (files.length) { jobs.push({ folder: baseName(r.name), files }); framesTotal += selected.length; }
+      if (!files.length) continue;
+      // Each video gets its own subfolder, all under APP_FOLDER/<batch>/…
+      for (const f of files) entries.push({ path: `${APP_FOLDER}/${folderName}/${baseName(r.name)}/${f.name}`, blob: f.blob });
+      framesTotal += selected.length;
     }
-    if (!jobs.length) return;
+    if (!entries.length) return;
 
     ui.saveAll.disabled = true;
-    const folderName = `${state.label || "batch"}-batch-${stamp()}`;
-    let baseDirHandle = state.dirHandle;
-    if (!baseDirHandle && isFSAccessSupported()) baseDirHandle = await pickDirectory();
     try {
-      if (baseDirHandle) baseDirHandle = await getSubdir(baseDirHandle, folderName);
-      const res = await writeJobs(jobs, { baseDirHandle, zipName: `${folderName}.zip` });
-      showSaved(framesTotal, res.mode);
-    } catch (e) {
-      try {
-        const { zipAndDownload } = await import("../io/save.js");
-        const entries = [];
-        for (const j of jobs) for (const f of j.files) entries.push({ path: `${j.folder}/${f.name}`, blob: f.blob });
-        await zipAndDownload(entries, `${folderName}.zip`);
-        showSaved(framesTotal, "zip");
-      } catch { setNotice(t("errorTitle"), true); ui.saveAll.disabled = false; }
-    }
+      await zipAndDownload(entries, `${APP_FOLDER}-${folderName}.zip`);
+      showSaved(framesTotal);
+    } catch { setNotice(t("errorTitle"), true); ui.saveAll.disabled = false; }
   }
 
-  function showSaved(count, mode) {
+  function showSaved(count) {
     show(ui.select, false); show(ui.saveBar, false); show(ui.saved, true);
     const suffix = settings.get("stitchFrames") ? stitchedSuffix() : "";
-    const modeNote = mode === "folder"
-      ? { ru: "Сохранено в выбранную папку.", uk: "Збережено в обрану папку.", en: "Saved to the chosen folder." }
-      : { ru: "Скачано ZIP-архивом.", uk: "Завантажено ZIP-архівом.", en: "Downloaded as a ZIP." };
-    ui.saved.innerHTML = `<div class="row">✅ <strong>${escapeHtml(savedFrames(count) + suffix)}</strong></div><p class="hint">${escapeHtml(pickLang(modeNote))}</p>`;
+    const note = {
+      ru: `Скачано в «Загрузки» → распакуйте архив: внутри папка ${APP_FOLDER}.`,
+      uk: `Завантажено в «Завантаження» → розпакуйте архів: усередині папка ${APP_FOLDER}.`,
+      en: `Downloaded to Downloads → unzip it: contains a ${APP_FOLDER} folder.`,
+    };
+    ui.saved.innerHTML = `<div class="row">✅ <strong>${escapeHtml(savedFrames(count) + suffix)}</strong></div><p class="hint">${escapeHtml(pickLang(note))}</p>`;
   }
 
   // ---------- misc ----------
@@ -272,7 +269,7 @@ export function initFolderTab() {
   function reset() {
     for (const r of state.results) disposeFrames(r.frames);
     for (const v of state.videos) if (v.thumb) { try { URL.revokeObjectURL(v.thumb); } catch {} }
-    state.dirHandle = null; state.label = ""; state.videos = []; state.results = []; state.ran = false;
+    state.label = ""; state.videos = []; state.results = []; state.ran = false;
     show(ui.body, false); show(ui.progress, false); show(ui.runBar, false);
     show(ui.select, false); show(ui.saveBar, false); show(ui.saved, false);
     clear(ui.grid); clear(ui.statusList); clear(ui.select);

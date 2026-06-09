@@ -11,13 +11,16 @@ import { transcribe } from "../transcribe/whisper.js";
 import { buildSRT, buildTXT } from "../transcribe/srt.js";
 import { probeVideo } from "../scene/frameSampler.js";
 import { renderFrameGrid } from "./frameGrid.js";
-import { writeJobs } from "../io/output.js";
-import { isFSAccessSupported, pickDirectory } from "../io/localFolder.js";
-import { downloadBlob } from "../io/save.js";
+import { downloadBlob, zipAndDownload } from "../io/save.js";
+import { fetchUrlToFile } from "../io/remote.js";
+
+// Top-level folder all output is grouped under (created on extract from the ZIP).
+const APP_FOLDER = "SceneShot";
 
 export function initVideoTab() {
   const ui = {
     drop: $("#videoDrop"), input: $("#videoInput"), pick: $("#videoPick"),
+    url: $("#videoUrl"), urlLoad: $("#videoUrlLoad"),
     summary: $("#videoSummary"), notice: $("#videoNotice"),
     doFrames: $("#videoDoFrames"), doTranscribe: $("#videoDoTranscribe"),
     langRow: $("#videoLangRow"), lang: $("#videoLang"),
@@ -45,6 +48,29 @@ export function initVideoTab() {
     if (f) setFile(f);
   });
 
+  // ---------- load by URL (direct video link; no backend, needs CORS) ----------
+  ui.urlLoad.addEventListener("click", loadFromUrl);
+  ui.url.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); loadFromUrl(); } });
+
+  async function loadFromUrl() {
+    const url = ui.url.value.trim();
+    if (!url || state.working) return;
+    setNotice(t("loadingUrl"));
+    ui.urlLoad.disabled = true; ui.pick.disabled = true;
+    try {
+      const file = await fetchUrlToFile(url, {
+        onProgress: (p) => setNotice(`${t("loadingUrl")} ${Math.round(p * 100)}%`),
+      });
+      setNotice("");
+      ui.url.value = "";
+      await setFile(file);
+    } catch {
+      setNotice(t("urlError"), true);
+    } finally {
+      ui.urlLoad.disabled = false; ui.pick.disabled = false;
+    }
+  }
+
   async function setFile(file) {
     resetResults();
     state.file = file; state.info = null;
@@ -69,9 +95,12 @@ export function initVideoTab() {
     updateRunEnabled();
   }
 
-  // ---------- action toggles ----------
-  ui.doFrames.addEventListener("change", updateRunEnabled);
-  ui.doTranscribe.addEventListener("change", () => { show(ui.langRow, ui.doTranscribe.checked); updateRunEnabled(); });
+  // ---------- action toggles (persisted) ----------
+  ui.doFrames.checked = settings.get("vid_frames");
+  ui.doTranscribe.checked = settings.get("vid_transcribe");
+  show(ui.langRow, ui.doTranscribe.checked);
+  ui.doFrames.addEventListener("change", () => { settings.set("vid_frames", ui.doFrames.checked); updateRunEnabled(); });
+  ui.doTranscribe.addEventListener("change", () => { settings.set("vid_transcribe", ui.doTranscribe.checked); show(ui.langRow, ui.doTranscribe.checked); updateRunEnabled(); });
   setSegActive(ui.lang, "data-lang", settings.get("tx_language"));
   $$("#videoLang .seg-btn").forEach((b) =>
     b.addEventListener("click", () => { settings.set("tx_language", b.getAttribute("data-lang")); setSegActive(ui.lang, "data-lang", settings.get("tx_language")); })
@@ -179,36 +208,28 @@ export function initVideoTab() {
     }
     const folder = `${baseName(state.file.name)}-${stamp()}`;
     ui.save.disabled = true;
-    let baseDirHandle = null;
-    if (isFSAccessSupported()) {
-      baseDirHandle = await pickDirectory();
-      if (!baseDirHandle) { ui.save.disabled = false; return; } // cancelled
-    }
     try {
-      const res = await writeJobs([{ folder, files }], { baseDirHandle, zipName: `${folder}.zip` });
-      showSaved(selected.length, res.mode);
+      // ZIP rooted under APP_FOLDER ("SceneShot/…") so extracting creates that folder in Downloads.
+      const entries = files.map((f) => ({ path: `${APP_FOLDER}/${folder}/${f.name}`, blob: f.blob }));
+      await zipAndDownload(entries, `${APP_FOLDER}-${folder}.zip`);
+      showSaved(selected.length);
       show(ui.select, false);
-    } catch (e) {
-      // folder write failed → fall back to ZIP
-      try {
-        const { zipAndDownload } = await import("../io/save.js");
-        await zipAndDownload(files.map((f) => ({ path: `${folder}/${f.name}`, blob: f.blob })), `${folder}.zip`);
-        showSaved(selected.length, "zip");
-        show(ui.select, false);
-      } catch {
-        setNotice(t("errorTitle")); ui.save.disabled = false;
-      }
+    } catch {
+      setNotice(t("errorTitle"), true);
+      ui.save.disabled = false;
     }
   }
 
-  function showSaved(count, mode) {
+  function showSaved(count) {
     state.savedDone = true;
     show(ui.saved, true);
     const suffix = settings.get("stitchFrames") ? stitchedSuffix() : "";
-    const modeNote = mode === "folder"
-      ? { ru: "Сохранено в выбранную папку.", uk: "Збережено в обрану папку.", en: "Saved to the chosen folder." }
-      : { ru: "Скачано ZIP-архивом.", uk: "Завантажено ZIP-архівом.", en: "Downloaded as a ZIP." };
-    ui.saved.innerHTML = `<div class="row">✅ <strong>${escapeHtml(savedFrames(count) + suffix)}</strong></div><p class="hint">${escapeHtml(pickLang(modeNote))}</p>`;
+    const note = {
+      ru: `Скачано в «Загрузки» → распакуйте архив: внутри папка ${APP_FOLDER}.`,
+      uk: `Завантажено в «Завантаження» → розпакуйте архів: усередині папка ${APP_FOLDER}.`,
+      en: `Downloaded to Downloads → unzip it: contains a ${APP_FOLDER} folder.`,
+    };
+    ui.saved.innerHTML = `<div class="row">✅ <strong>${escapeHtml(savedFrames(count) + suffix)}</strong></div><p class="hint">${escapeHtml(pickLang(note))}</p>`;
   }
 
   // ---------- transcript ----------
