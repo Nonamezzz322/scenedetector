@@ -65,6 +65,11 @@ export function initSettingsPanel() {
   // ----- Transcription language + device -----
   bindSegmented("#txLang", "data-lang", "tx_language");
   bindSegmented("#txDevice", "data-val", "tx_device");
+
+  // ----- CORS proxy URL -----
+  const proxy = $("#proxyUrl");
+  proxy.value = settings.get("proxyUrl");
+  proxy.addEventListener("change", () => settings.set("proxyUrl", proxy.value.trim().replace(/\/+$/, "")));
 }
 
 function bindCheckbox(sel, key) {

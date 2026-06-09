@@ -279,6 +279,14 @@
           <hr />
 
           <section class="settings-group">
+            <h3 data-i18n="proxyTitle">Прокси для ссылок (Dropbox / Google Drive)</h3>
+            <input type="url" id="proxyUrl" class="text" data-i18n-ph="proxyPlaceholder" placeholder="" style="width:100%" />
+            <p class="hint" data-i18n="proxyHint">Чтобы открывать видео по ссылкам с Dropbox/Google Drive (и прямым ссылкам без CORS), задеплойте бесплатный Cloudflare Worker (см. папку cloudflare-proxy) и вставьте его адрес сюда. YouTube/TikTok/Instagram так не работают.</p>
+          </section>
+
+          <hr />
+
+          <section class="settings-group">
             <h3 data-i18n="aboutTitle">О приложении</h3>
             <p class="hint" data-i18n="aboutBody">Всё происходит локально в браузере: ни видео, ни кадры, ни текст никуда не загружаются. Запись результата в выбранную папку доступна в Chrome/Edge; в других браузерах результат скачивается ZIP-архивом.</p>
           </section>

@@ -21,6 +21,8 @@ const DEFAULTS = {
   tx_txt: true,
   tx_srt: true,
   tx_device: "auto",      // "auto" | "webgpu" | "wasm"
+  // optional CORS proxy (Cloudflare Worker) for Dropbox / Google Drive / non-CORS direct links
+  proxyUrl: "",
   // UI state (persisted so choices survive reloads, like the desktop @AppStorage toggles)
   vid_frames: true,
   vid_transcribe: false,

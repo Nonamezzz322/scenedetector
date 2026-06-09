@@ -12,7 +12,7 @@ import { buildSRT, buildTXT } from "../transcribe/srt.js";
 import { probeVideo } from "../scene/frameSampler.js";
 import { renderFrameGrid } from "./frameGrid.js";
 import { downloadBlob, zipAndDownload } from "../io/save.js";
-import { fetchUrlToFile } from "../io/remote.js";
+import { loadVideoFromLink } from "../io/remote.js";
 
 // Top-level folder all output is grouped under (created on extract from the ZIP).
 const APP_FOLDER = "SceneShot";
@@ -58,14 +58,18 @@ export function initVideoTab() {
     setNotice(t("loadingUrl"));
     ui.urlLoad.disabled = true; ui.pick.disabled = true;
     try {
-      const file = await fetchUrlToFile(url, {
+      const file = await loadVideoFromLink(url, {
+        proxyUrl: settings.get("proxyUrl"),
         onProgress: (p) => setNotice(`${t("loadingUrl")} ${Math.round(p * 100)}%`),
       });
       setNotice("");
       ui.url.value = "";
       await setFile(file);
-    } catch {
-      setNotice(t("urlError"), true);
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "social") setNotice(t("urlSocial"), true);
+      else if (code === "needs-proxy" || code === "cors") setNotice(t("urlNeedsProxy"), true);
+      else setNotice(t("urlError"), true);
     } finally {
       ui.urlLoad.disabled = false; ui.pick.disabled = false;
     }
