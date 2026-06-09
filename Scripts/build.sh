@@ -81,13 +81,17 @@ fi
 # Bundle the whisper.cpp MIT license + model attribution.
 [ -f "$ROOT/Resources/WHISPER-LICENSE.txt" ] && cp "$ROOT/Resources/WHISPER-LICENSE.txt" "$APP/Contents/Resources/WHISPER-LICENSE.txt"
 
-# 3) Ad-hoc codesign: nested helpers FIRST, then the app bundle.
-log "ad-hoc codesign"
+# 3) Ad-hoc codesign. Clear stray extended attributes first — they invalidate the seal and
+#    make OTHER Macs report "SceneShot is damaged" (the #1 cause of "won't launch elsewhere").
+#    Then sign nested helpers FIRST, then the app bundle, and FAIL the build if the signature
+#    isn't valid (a valid signature is what keeps macOS from calling it "damaged").
+log "clean xattrs + ad-hoc codesign"
+xattr -cr "$APP" 2>/dev/null || true
 if [ -d "$APP/Contents/Resources/Helpers" ]; then
     find "$APP/Contents/Resources/Helpers" -type f \( -name 'ffmpeg' -o -name 'ffprobe' -o -name 'whisper-cli' -o -name 'yt-dlp' \) -exec codesign -s - --force {} \;
 fi
 codesign -s - --force "$APP"
-codesign --verify --strict --verbose=1 "$APP" || true
+codesign --verify --deep --strict --verbose=2 "$APP"
 
 log "done"
 echo "app:   $APP"
