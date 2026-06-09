@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Not sandboxed. The app runs bundled, separately-signed ffmpeg/whisper-cli; this entitlement
+         keeps the hardened runtime from blocking those under Developer ID signing. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- NO com.apple.security.cs.allow-jit / allow-unsigned-executable-memory: the CPU-only ggml
+         whisper-cli runs precompiled NEON/AVX SIMD kernels and never maps W^X memory, so JIT
+         entitlements aren't needed (least privilege; avoids a notarization-attention flag). Only a
+         future Metal/Core ML build would require them.
+         NOTE for Developer ID + notarization: the bundled yt-dlp is a PyInstaller binary; under
+         hardened runtime it typically needs ADDING here:
+           com.apple.security.cs.allow-unsigned-executable-memory  (true)
+         (ad-hoc local builds run fine without it). -->
+    <!-- Cloud (Dropbox/Google Drive): not sandboxed → outbound HTTPS works without extra
+         entitlements. If sandboxing is ever enabled, ADD com.apple.security.network.client.
+         OAuth uses PKCE (public client) — no client secret is shipped. Tokens are stored in a
+         0600 file under Application Support (see Sources/SceneShot/Cloud/TokenStore.swift), NOT the
+         Keychain — ad-hoc-signed builds change code identity each rebuild, which makes the Keychain
+         re-prompt for the password endlessly. -->
+</dict>
+</plist>

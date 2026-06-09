@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SceneShot Web</title>
+  <meta name="description" content="Извлечение кадров на смене сцены и транскрипция речи — полностью в браузере, без загрузки на сервер." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f7cff'/%3E%3Cpath d='M28 34h44v32H28z' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='50' cy='50' r='8' fill='white'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar: segmented tabs + gear -->
+    <header class="topbar">
+      <div class="segmented" role="tablist" id="tabbar">
+        <button class="seg-btn is-active" data-tab="video" role="tab" data-i18n="tabVideo">Видео</button>
+        <button class="seg-btn" data-tab="folder" role="tab" data-i18n="tabFolder">Папка</button>
+      </div>
+      <button class="icon-btn" id="settingsBtn" title="Настройки" aria-label="Настройки">⚙</button>
+    </header>
+
+    <main class="content">
+      <!-- ===================== VIDEO TAB ===================== -->
+      <section class="tab-panel is-active" id="tab-video">
+        <div class="hero">
+          <h1>SceneShot</h1>
+          <p class="subtitle" data-i18n="videoSubtitle">Кадры на смене сцены и транскрипция речи</p>
+        </div>
+
+        <div class="dropzone" id="videoDrop">
+          <div class="dropzone-icon">🎬</div>
+          <p data-i18n="dropVideo">Перетащите сюда видеофайл</p>
+          <button class="btn" id="videoPick" data-i18n="chooseVideo">Выбрать видео…</button>
+          <input type="file" id="videoInput" accept="video/*,audio/*" hidden />
+        </div>
+
+        <div class="source-summary" id="videoSummary" hidden></div>
+
+        <div class="actions-box">
+          <label class="check"><input type="checkbox" id="videoDoFrames" checked /> <span data-i18n="doFrames">Извлечь кадры</span></label>
+          <label class="check"><input type="checkbox" id="videoDoTranscribe" /> <span data-i18n="doTranscribe">Транскрибировать</span></label>
+          <div class="lang-row" id="videoLangRow" hidden>
+            <span class="lang-label" data-i18n="languageLabel">Язык</span>
+            <div class="segmented small" id="videoLang">
+              <button class="seg-btn is-active" data-lang="auto" data-i18n="langAuto">Авто</button>
+              <button class="seg-btn" data-lang="ru" data-i18n="langRu">Русский</button>
+              <button class="seg-btn" data-lang="uk" data-i18n="langUk">Украинский</button>
+              <button class="seg-btn" data-lang="en" data-i18n="langEn">English</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="notice" id="videoNotice" hidden></p>
+
+        <div class="progress-box" id="videoProgress" hidden>
+          <p class="phase" id="videoPhase"></p>
+          <div class="bar"><div class="bar-fill" id="videoBarFill"></div></div>
+          <div class="progress-meta">
+            <span id="videoPct">0%</span>
+            <span id="videoEta" class="muted"></span>
+            <button class="btn ghost" id="videoCancel" data-i18n="cancel">Отменить</button>
+          </div>
+        </div>
+
+        <div class="run-bar" id="videoRunBar">
+          <button class="btn primary big" id="videoRun" disabled>▶ <span data-i18n="process">Обработать</span></button>
+          <p class="hint" id="videoPickHint" data-i18n="pickAtLeastOne" hidden>Выберите хотя бы одно действие</p>
+        </div>
+
+        <!-- Frame selection -->
+        <div class="select-section" id="videoSelect" hidden>
+          <h3 data-i18n="selectFramesTitle">Выберите кадры для сохранения</h3>
+          <p class="hint" data-i18n="selectFramesHint">Кликайте кадры в нужном порядке — цифра = порядок.</p>
+          <div class="select-toolbar">
+            <button class="btn small" id="videoSelectAll" data-i18n="selectAll">Выбрать все</button>
+            <button class="btn small" id="videoClearAll" data-i18n="clearAll">Снять все</button>
+            <span class="muted" id="videoSelCount"></span>
+          </div>
+          <div class="frame-grid" id="videoFrameGrid"></div>
+          <button class="btn primary big" id="videoSave" disabled></button>
+        </div>
+
+        <!-- Results -->
+        <div class="result-card ok" id="videoSaved" hidden></div>
+        <div class="result-card" id="videoResult" hidden></div>
+        <div class="result-card" id="videoTranscript" hidden></div>
+      </section>
+
+      <!-- ===================== FOLDER TAB ===================== -->
+      <section class="tab-panel" id="tab-folder">
+        <div class="hero">
+          <h1 data-i18n="tabFolder">Папка</h1>
+          <p class="subtitle" data-i18n="folderSubtitle">Превью видео из папки и пакетная обработка</p>
+        </div>
+
+        <div class="folder-input">
+          <button class="btn" id="folderPick" data-i18n="chooseLocalFolder">Выбрать локальную папку…</button>
+          <input type="file" id="folderInput" webkitdirectory directory multiple hidden />
+          <p class="hint" id="folderHint" data-i18n="folderHowto">Выберите папку с видеофайлами — они останутся на вашем компьютере.</p>
+        </div>
+
+        <p class="notice" id="folderNotice" hidden></p>
+
+        <div class="folder-body" id="folderBody" hidden>
+          <div class="select-toolbar">
+            <span class="muted" id="folderSelCount"></span>
+            <button class="btn small" id="folderSelectAll" data-i18n="selectAll">Выбрать все</button>
+            <button class="btn small" id="folderClearAll" data-i18n="clearAll">Снять все</button>
+          </div>
+
+          <div class="actions-box">
+            <label class="check"><input type="checkbox" id="folderDoFrames" checked /> <span data-i18n="doFrames">Извлечь кадры</span></label>
+            <label class="check"><input type="checkbox" id="folderDoTranscribe" /> <span data-i18n="doTranscribe">Транскрибировать</span></label>
+            <div class="lang-row" id="folderLangRow" hidden>
+              <span class="lang-label" data-i18n="languageLabel">Язык</span>
+              <div class="segmented small" id="folderLang">
+                <button class="seg-btn is-active" data-lang="auto" data-i18n="langAuto">Авто</button>
+                <button class="seg-btn" data-lang="ru" data-i18n="langRu">Русский</button>
+                <button class="seg-btn" data-lang="uk" data-i18n="langUk">Украинский</button>
+                <button class="seg-btn" data-lang="en" data-i18n="langEn">English</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="thumb-grid" id="folderGrid"></div>
+        </div>
+
+        <div class="progress-box" id="folderProgress" hidden>
+          <p class="phase" id="folderPhase"></p>
+          <div class="bar"><div class="bar-fill" id="folderBarFill"></div></div>
+          <div class="progress-meta">
+            <span id="folderPct">0%</span>
+            <button class="btn ghost" id="folderCancel" data-i18n="cancel">Отменить</button>
+          </div>
+          <div class="batch-status" id="folderStatusList"></div>
+        </div>
+
+        <div class="run-bar" id="folderRunBar" hidden>
+          <button class="btn primary big" id="folderRun" disabled></button>
+        </div>
+
+        <!-- Per-video frame selection after batch -->
+        <div class="select-section" id="folderSelect" hidden></div>
+        <div class="run-bar" id="folderSaveBar" hidden>
+          <button class="btn primary big" id="folderSaveAll"></button>
+        </div>
+
+        <div class="result-card ok" id="folderSaved" hidden></div>
+      </section>
+    </main>
+
+    <!-- ===================== SETTINGS OVERLAY ===================== -->
+    <div class="settings-overlay" id="settingsOverlay" hidden>
+      <div class="settings-panel">
+        <div class="settings-head">
+          <h2 data-i18n="settingsTitle">Настройки</h2>
+          <button class="btn primary" id="settingsDone" data-i18n="done">Готово</button>
+        </div>
+        <div class="settings-body">
+
+          <section class="settings-group">
+            <h3 data-i18n="settingsLanguageSection">Язык приложения</h3>
+            <div class="segmented" id="appLang">
+              <button class="seg-btn" data-lang="ru">Русский</button>
+              <button class="seg-btn" data-lang="uk">Українська</button>
+              <button class="seg-btn" data-lang="en">English</button>
+            </div>
+          </section>
+
+          <hr />
+
+          <section class="settings-group">
+            <h3 data-i18n="settingsFramesSection">Кадры</h3>
+
+            <div class="setting">
+              <div class="setting-head">
+                <strong data-i18n="sensitivity">Чувствительность</strong>
+                <span class="mono muted" id="thresholdVal">0.30</span>
+              </div>
+              <div class="segmented small" id="sensPreset">
+                <button class="seg-btn" data-val="0.45" data-i18n="sensLow">Низкая</button>
+                <button class="seg-btn is-active" data-val="0.30" data-i18n="sensMed">Средняя</button>
+                <button class="seg-btn" data-val="0.18" data-i18n="sensHigh">Высокая</button>
+              </div>
+              <input type="range" id="threshold" min="0.05" max="0.9" step="0.01" value="0.30" />
+              <p class="hint" data-i18n="sensitivityHint">Ниже порог — больше кадров</p>
+            </div>
+
+            <div class="setting">
+              <label class="check"><input type="checkbox" id="dedupScenes" checked /> <span data-i18n="dedupScenes">Только отдельные сцены (убирать похожие кадры)</span></label>
+              <p class="hint" data-i18n="dedupHint">Каждый кадр сравнивается с уже сохранёнными; похожие сильнее чувствительности — отбрасываются.</p>
+            </div>
+
+            <div class="setting">
+              <label class="check"><input type="checkbox" id="rejectLowDetail" checked /> <span data-i18n="rejectLowDetailLabel">Убирать пустые кадры (чёрные / размытые переходы)</span></label>
+            </div>
+
+            <div class="setting">
+              <div class="setting-row">
+                <span data-i18n="settleDelayLabel">Снимать через паузу после перехода, с</span>
+                <input type="number" id="settleDelay" min="0" max="2" step="0.1" value="0.4" class="num" />
+              </div>
+              <p class="hint" data-i18n="settleDelayHint">0 = в момент склейки. Больше — пропускает эффект и берёт осевшую сцену.</p>
+            </div>
+
+            <div class="setting setting-row">
+              <span data-i18n="minIntervalLabel">Мин. интервал, с (0 = выкл)</span>
+              <input type="number" id="minInterval" min="0" max="60" step="0.5" value="0" class="num" />
+            </div>
+
+            <div class="setting setting-row">
+              <strong data-i18n="imageFormat">Формат изображения</strong>
+              <div class="segmented small" id="format">
+                <button class="seg-btn is-active" data-val="jpg">JPG</button>
+                <button class="seg-btn" data-val="png">PNG</button>
+              </div>
+            </div>
+
+            <div class="setting setting-row" id="jpegQualityRow">
+              <span data-i18n="jpegQuality">Качество JPEG</span>
+              <input type="range" id="jpegQuality" min="2" max="31" step="1" value="3" />
+              <span class="mono" id="jpegQualityVal">3</span>
+            </div>
+
+            <div class="setting setting-row">
+              <span data-i18n="maxWidthLabel">Макс. ширина (0 = как есть)</span>
+              <input type="number" id="maxWidth" min="0" step="1" value="0" class="num" />
+            </div>
+
+            <div class="setting setting-row">
+              <span data-i18n="maxFramesLabel">Макс. кадров (0 = без лимита)</span>
+              <input type="number" id="maxFrames" min="0" step="1" value="0" class="num" />
+            </div>
+
+            <div class="setting setting-row">
+              <span data-i18n="filenameTemplate">Шаблон имени файла</span>
+              <input type="text" id="filenameTemplate" value="scene_{index}_{time}" class="text" />
+            </div>
+
+            <div class="setting">
+              <label class="check"><input type="checkbox" id="stitchFrames" checked /> <span data-i18n="stitchFrames">Склеить выбранные в одну картинку</span></label>
+              <p class="hint" data-i18n="stitchHint">Сохраняет выбранные кадры ещё и одной картинкой (слева направо в порядке кликов).</p>
+            </div>
+          </section>
+
+          <hr />
+
+          <section class="settings-group">
+            <h3 data-i18n="settingsTranscriptionSection">Транскрипция</h3>
+            <div class="setting setting-row">
+              <span data-i18n="languageLabel">Язык</span>
+              <div class="segmented small" id="txLang">
+                <button class="seg-btn is-active" data-lang="auto" data-i18n="langAuto">Авто</button>
+                <button class="seg-btn" data-lang="ru" data-i18n="langRu">Русский</button>
+                <button class="seg-btn" data-lang="uk" data-i18n="langUk">Украинский</button>
+                <button class="seg-btn" data-lang="en" data-i18n="langEn">English</button>
+              </div>
+            </div>
+            <div class="setting">
+              <label class="check"><input type="checkbox" id="txTxt" checked /> <span data-i18n="formatTxt">Текст (TXT)</span></label>
+              <label class="check"><input type="checkbox" id="txSrt" checked /> <span data-i18n="formatSrt">Субтитры (SRT)</span></label>
+            </div>
+            <div class="setting setting-row">
+              <span data-i18n="txEngine">Движок распознавания</span>
+              <div class="segmented small" id="txDevice">
+                <button class="seg-btn is-active" data-val="auto" data-i18n="txDeviceAuto">Авто</button>
+                <button class="seg-btn" data-val="webgpu">WebGPU</button>
+                <button class="seg-btn" data-val="wasm">CPU</button>
+              </div>
+            </div>
+            <p class="hint" data-i18n="txModelHint">Первый запуск скачивает модель распознавания (~80 МБ) с huggingface.co. Дальше работает офлайн из кэша браузера.</p>
+          </section>
+
+          <hr />
+
+          <section class="settings-group">
+            <h3 data-i18n="aboutTitle">О приложении</h3>
+            <p class="hint" data-i18n="aboutBody">Всё происходит локально в браузере: ни видео, ни кадры, ни текст никуда не загружаются. Запись результата в выбранную папку доступна в Chrome/Edge; в других браузерах результат скачивается ZIP-архивом.</p>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Build output
+/dist/
+/.build/
+
+# Fetched binary dependencies (reproducible via Scripts/fetch-*.sh) — too large for GitHub
+# (ggml-base.bin is 141MB, over GitHub's 100MB/file limit). Not needed for the web deploy.
+/Resources/Helpers/
+/Resources/Models/
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp

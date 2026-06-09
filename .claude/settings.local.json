@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/anatoliivovchok/Desktop/scenedetector/.claude/agents /Users/anatoliivovchok/Desktop/scenedetector/.claude/skills/implement-stage /Users/anatoliivovchok/Desktop/scenedetector/.claude/skills/build /Users/anatoliivovchok/Desktop/scenedetector/.claude/skills/review-changes /Users/anatoliivovchok/Desktop/scenedetector/.claude/skills/release && echo created)",
+      "Bash(chmod +x Scripts/build.sh)",
+      "Bash(./Scripts/build.sh)"
+    ],
+    "additionalDirectories": [
+      "/Users/anatoliivovchok/Desktop/scenedetector/.claude"
+    ]
+  }
+}
